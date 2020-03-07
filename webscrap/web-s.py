@@ -1,4 +1,3 @@
-from time import sleep
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -7,20 +6,21 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.remote.command import Command
 from selenium.common.exceptions import TimeoutException
-from random import randint
 import json
 import re
 import http.client
 import socket
 
-LOADING_ELEMENT_XPATH = '//div[@class="spinner-overlay"]'
+LOADING_ELEMENT_XPATH = '//div[@class="spinner-overlay"]' # Loader div selector
 
 class swSpider():
 
+	# initialize swSpider object
 	def __init__(self):
 		self.url_to_crawl = "https://swarfarm.com/bestiary/"
 		self.monsters = []
 
+	# returns the driver status
 	def get_status(self):
 		try:
 			self.driver.execute(Command.STATUS)
@@ -28,6 +28,7 @@ class swSpider():
 		except (socket.error, http.client.CannotSendRequest):
 			return "Dead"
 
+	# start a chromedriver with few options
 	def start_driver(self):
 		print('\t\tstarting driver...')
 		chrome_options = Options()
@@ -38,11 +39,13 @@ class swSpider():
 		chrome_options.add_argument("--disable-dev-shm-usage")
 		self.driver = webdriver.Chrome('/usr/lib/chromium-browser/chromedriver', chrome_options=chrome_options)
 
+	# closes driver
 	def close_driver(self):
 		print('\t\tclosing driver...')
 		self.driver.quit()
 		print('\t\t\tclosed!')
 
+	# restart the driver and access the url
 	def get_page(self, url):
 		print('\tgetting page...')
 		if self.get_status() == "Alive":
@@ -52,6 +55,7 @@ class swSpider():
 			self.start_driver()
 		self.driver.get(url)
 
+	# loop: while the loader is here, wait
 	def wait_for_loader(self):
 		print('\twaiting for loader to vanish...')
 		while True:
@@ -60,6 +64,7 @@ class swSpider():
 			except TimeoutException:
 				break
 
+	# main function, find all basic infos about monsters on main page
 	def grabMonsters(self):
 		print('grabbing monsters...')
 		self.get_page(self.url_to_crawl)
@@ -98,21 +103,27 @@ class swSpider():
 			pageBtn[len(pageBtn)-1].click()
 		self.completeMonsters()
 
+	# use every monster personal page to get more informations
 	def completeMonsters(self):
 		print('Completing monsters...')
+		# for every monster in monsters
 		for monster in self.monsters:
 			print('\n')
 			print('Parsing '+monster['name']+' data...')
+			# we access the monster personal page
 			self.get_page(self.url_to_crawl + monster['url'])
 			content = self.driver.page_source
 			self.soup = BeautifulSoup(content, 'html.parser')
+			# separating informations in groups rows[0] and rows[1] being for the unawakened monster
 			rows = self.soup.find_all('div', attrs={'class':'col-lg-6'})
+			# little check in case of missing informations (cf. Varis page)
 			if(len(rows)>2):
 				skills = rows[2].find('div', attrs={'class':'row condensed'})
 			else:
 				skills = rows[0].find('div', attrs={'class':'row condensed'})
-			i=1
+			i=1 # This is the skill index
 			monster['skills'] = {}
+			# for each skill found in skills
 			for skill in skills.find_all('div', attrs={'class':['col-lg-3','col-lg-4']}):
 				monster['skills'][i] = {}
 				monster['skills'][i]['title'] = skill.find('p', attrs={'class':'panel-title'}).text
@@ -149,6 +160,7 @@ class swSpider():
 sw = swSpider()
 monsters = sw.parse()
 
+# formats data and store it in monsters.json
 with open('monsters.json', 'w') as f:
 	json.dump(sw.monsters, f, ensure_ascii=False, indent=4)
 #"""
